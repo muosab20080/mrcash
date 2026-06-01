@@ -13,10 +13,11 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Verify the TOTP code
+    // Verify the TOTP code with window to allow for clock drift (±30 seconds)
     const isValid = verify({
       token: code,
       secret: secret,
+      window: 1,
     });
 
     if (!isValid) {

@@ -17,7 +17,6 @@ import {
   X,
   ShieldCheck,
   Globe,
-  Settings,
   Crown,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -47,7 +46,6 @@ const navItems = [
   { href: "/cashout", label: "Cashout", icon: Wallet },
   { href: "/offers", label: "Offers", icon: LayoutGrid },
   { href: "/profile", label: "Profile", icon: User },
-  { href: "/settings", label: "Settings", icon: Settings },
 ];
 
 export function Sidebar({ isOpen, onClose, isCollapsed = false }: SidebarProps) {

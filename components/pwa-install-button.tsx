@@ -1,18 +1,18 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Download, X, Smartphone } from "lucide-react";
+import { Download, Smartphone } from "lucide-react";
 
 interface BeforeInstallPromptEvent extends Event {
   prompt: () => Promise<void>;
   userChoice: Promise<{ outcome: "accepted" | "dismissed" }>;
 }
 
-export function PWAInstallButton({ variant = "button" }: { variant?: "button" | "card" }) {
+export function PWAInstallButton({ variant = "button" }: { variant?: "button" | "card" | "header" }) {
   const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null);
   const [isInstallable, setIsInstallable] = useState(false);
   const [isInstalled, setIsInstalled] = useState(false);
-  const [showIOSPrompt, setShowIOSPrompt] = useState(false);
+  const [isIOS, setIsIOS] = useState(false);
 
   useEffect(() => {
     // Check if already installed
@@ -22,16 +22,8 @@ export function PWAInstallButton({ variant = "button" }: { variant?: "button" | 
     }
 
     // Check if running on iOS
-    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
-    const isInStandaloneMode = window.matchMedia("(display-mode: standalone)").matches;
-    
-    if (isIOS && !isInStandaloneMode) {
-      // Show iOS-specific install instructions
-      const hasSeenIOSPrompt = localStorage.getItem("ios_pwa_prompt_seen");
-      if (!hasSeenIOSPrompt) {
-        setShowIOSPrompt(true);
-      }
-    }
+    const isIOSDevice = /iPad|iPhone|iPod/.test(navigator.userAgent);
+    setIsIOS(isIOSDevice);
 
     // Listen for the beforeinstallprompt event (Android/Chrome)
     const handleBeforeInstallPrompt = (e: Event) => {
@@ -74,47 +66,47 @@ export function PWAInstallButton({ variant = "button" }: { variant?: "button" | 
     }
   };
 
-  const dismissIOSPrompt = () => {
-    localStorage.setItem("ios_pwa_prompt_seen", "true");
-    setShowIOSPrompt(false);
-  };
-
   // Don't show if already installed
   if (isInstalled) return null;
 
-  // iOS Install Prompt
-  if (showIOSPrompt) {
-    return (
-      <div className="fixed bottom-0 inset-x-0 z-[150] p-4 animate-in slide-in-from-bottom duration-500">
-        <div className="max-w-md mx-auto glass-card p-4 shadow-2xl">
+  // Card variant for sidebar/profile - always show with iOS instructions
+  if (variant === "card") {
+    if (isIOS) {
+      return (
+        <div className="w-full p-4 rounded-xl glass-card">
           <div className="flex items-start gap-3">
-            <div className="w-12 h-12 rounded-xl brand-gradient flex items-center justify-center shrink-0">
-              <Smartphone className="w-6 h-6 text-white" />
+            <div className="w-10 h-10 rounded-xl brand-gradient flex items-center justify-center shrink-0">
+              <Smartphone className="w-5 h-5 text-white" />
             </div>
             <div className="flex-1 min-w-0">
-              <div className="flex items-center justify-between mb-2">
-                <h3 className="font-bold text-foreground text-sm">Install App</h3>
-                <button onClick={dismissIOSPrompt} className="text-muted-foreground hover:text-foreground">
-                  <X className="w-4 h-4" />
-                </button>
-              </div>
-              <p className="text-xs text-muted-foreground leading-relaxed mb-3">
-                To install MrCash on your device: tap the share icon 
+              <p className="font-bold text-foreground text-sm mb-1">Install MrCash</p>
+              <p className="text-xs text-muted-foreground leading-relaxed">
+                Tap the share icon 
                 <span className="inline-block mx-1 px-1.5 py-0.5 bg-secondary rounded text-[10px]">Share</span>
                 then select &quot;Add to Home Screen&quot;
               </p>
             </div>
           </div>
         </div>
-      </div>
-    );
-  }
+      );
+    }
 
-  // Don't show if not installable (on desktop/unsupported browsers)
-  if (!isInstallable) return null;
+    if (!isInstallable) {
+      return (
+        <div className="w-full p-4 rounded-xl glass-card opacity-60">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-secondary flex items-center justify-center shrink-0">
+              <Download className="w-5 h-5 text-muted-foreground" />
+            </div>
+            <div className="text-left">
+              <p className="font-bold text-foreground text-sm">App Installed</p>
+              <p className="text-xs text-muted-foreground">MrCash is on your device</p>
+            </div>
+          </div>
+        </div>
+      );
+    }
 
-  // Card variant for sidebar/profile
-  if (variant === "card") {
     return (
       <button
         onClick={handleInstallClick}
@@ -131,7 +123,25 @@ export function PWAInstallButton({ variant = "button" }: { variant?: "button" | 
     );
   }
 
+  // Header variant - compact icon button
+  if (variant === "header") {
+    // Don't show header button for iOS (they need the card instructions)
+    if (isIOS || !isInstallable) return null;
+
+    return (
+      <button
+        onClick={handleInstallClick}
+        className="flex items-center justify-center h-9 w-9 rounded-xl hover:bg-secondary text-muted-foreground hover:text-foreground transition-colors"
+        title="Install App"
+      >
+        <Download className="h-4 w-4" />
+      </button>
+    );
+  }
+
   // Default button variant
+  if (!isInstallable && !isIOS) return null;
+
   return (
     <button
       onClick={handleInstallClick}

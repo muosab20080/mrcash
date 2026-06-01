@@ -27,7 +27,7 @@ export async function POST(request: NextRequest) {
     
     if (!userData?.twoFactorEnabled || !userData?.twoFactorSecret) {
       return NextResponse.json(
-        { error: "2FA not enabled for this user" },
+        { error: "2FA is not enabled for this user" },
         { status: 400 }
       );
     }
@@ -41,16 +41,22 @@ export async function POST(request: NextRequest) {
 
     if (!isValid) {
       return NextResponse.json(
-        { error: "Invalid verification code", valid: false },
+        { error: "Invalid verification code" },
         { status: 400 }
       );
     }
 
-    return NextResponse.json({ valid: true });
+    // Disable 2FA by removing the secret and flag
+    await adminDb.collection("users").doc(userId).update({
+      twoFactorEnabled: false,
+      twoFactorSecret: null,
+    });
+
+    return NextResponse.json({ success: true });
   } catch (error) {
-    console.error("2FA login verification error:", error);
+    console.error("2FA disable error:", error);
     return NextResponse.json(
-      { error: "Failed to verify 2FA code" },
+      { error: "Failed to disable 2FA" },
       { status: 500 }
     );
   }

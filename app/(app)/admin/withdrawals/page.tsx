@@ -14,6 +14,7 @@ import {
   where,
   serverTimestamp,
   increment,
+  addDoc,
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -91,7 +92,8 @@ export default function AdminWithdrawalsPage() {
     status: "completed" | "rejected",
     refundPoints: boolean = false,
     userId?: string,
-    pointsToRefund?: number
+    pointsToRefund?: number,
+    amountUSD?: number
   ) => {
     setProcessing(id);
     try {
@@ -114,6 +116,22 @@ export default function AdminWithdrawalsPage() {
       }
 
       await batch.commit();
+      
+      // Create notification for the user
+      if (userId) {
+        await addDoc(collection(db, "notifications"), {
+          userId,
+          title: status === "completed" ? "Withdrawal Approved" : "Withdrawal Rejected",
+          message: status === "completed" 
+            ? `Your withdrawal of $${(amountUSD || 0).toFixed(2)} has been approved and is being processed.`
+            : refundPoints 
+              ? `Your withdrawal request was rejected. ${(pointsToRefund || 0).toLocaleString()} points have been refunded to your account.`
+              : `Your withdrawal request was rejected. Please contact support for more information.`,
+          type: status === "completed" ? "withdrawal_approved" : "withdrawal_rejected",
+          read: false,
+          createdAt: serverTimestamp(),
+        });
+      }
       
       if (status === "completed") {
         toast.success("Withdrawal approved");
@@ -395,7 +413,7 @@ export default function AdminWithdrawalsPage() {
                         <Button
                           size="sm"
                           onClick={() =>
-                            updateWithdrawalStatus(withdrawal.id, "completed", false)
+                            updateWithdrawalStatus(withdrawal.id, "completed", false, withdrawal.userId, undefined, withdrawal.amountUSD)
                           }
                           disabled={processing === withdrawal.id}
                           className="bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl"
@@ -420,7 +438,8 @@ export default function AdminWithdrawalsPage() {
                               "rejected",
                               true,
                               withdrawal.userId,
-                              withdrawal.pointsDeducted
+                              withdrawal.pointsDeducted,
+                              withdrawal.amountUSD
                             )
                           }
                           disabled={processing === withdrawal.id}
@@ -444,7 +463,10 @@ export default function AdminWithdrawalsPage() {
                             updateWithdrawalStatus(
                               withdrawal.id,
                               "rejected",
-                              false
+                              false,
+                              withdrawal.userId,
+                              undefined,
+                              withdrawal.amountUSD
                             )
                           }
                           disabled={processing === withdrawal.id}

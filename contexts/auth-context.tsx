@@ -61,6 +61,19 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 const googleProvider = new GoogleAuthProvider();
 
+// Helper function to log login events
+async function logLoginEvent(userId: string) {
+  try {
+    await fetch("/api/auth/log-login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ userId }),
+    });
+  } catch (error) {
+    console.error("Failed to log login:", error);
+  }
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [userData, setUserData] = useState<UserData | null>(null);
@@ -113,7 +126,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [router]);
 
   const login = async (email: string, password: string) => {
-    await signInWithEmailAndPassword(auth, email, password);
+    const result = await signInWithEmailAndPassword(auth, email, password);
+    // Log login for history tracking (fire and forget)
+    logLoginEvent(result.user.uid).catch(console.error);
   };
 
   const loginWithGoogle = async () => {
@@ -148,6 +163,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         await setDoc(userDocRef, { photoURL: firebaseUser.photoURL }, { merge: true });
       }
     }
+    
+    // Log login for history tracking (fire and forget)
+    logLoginEvent(firebaseUser.uid).catch(console.error);
   };
 
   const register = async (email: string, password: string, username: string, photoURL?: string, referralCode?: string) => {

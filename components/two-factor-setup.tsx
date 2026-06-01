@@ -4,7 +4,7 @@ import { useState } from "react";
 import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
-import { Loader2, Shield, Smartphone, Key, Copy, Check, ArrowRight, ArrowLeft } from "lucide-react";
+import { Loader2, Shield, Smartphone, Key, Copy, Check, ArrowRight, ArrowLeft, ShieldOff } from "lucide-react";
 import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp";
 import { cn } from "@/lib/utils";
 
@@ -26,6 +26,11 @@ export function TwoFactorSetup({ userId, email, isEnabled, onComplete }: TwoFact
   } | null>(null);
   const [verificationCode, setVerificationCode] = useState("");
   const [copied, setCopied] = useState(false);
+  
+  // State for disabling 2FA
+  const [showDisableConfirm, setShowDisableConfirm] = useState(false);
+  const [disableCode, setDisableCode] = useState("");
+  const [disabling, setDisabling] = useState(false);
 
   const startSetup = async () => {
     setLoading(true);
@@ -44,8 +49,9 @@ export function TwoFactorSetup({ userId, email, isEnabled, onComplete }: TwoFact
 
       setSetupData(data);
       setStep(2);
-    } catch (error: any) {
-      toast.error(error.message || "Failed to setup 2FA");
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : "Failed to setup 2FA";
+      toast.error(errorMessage);
     } finally {
       setLoading(false);
     }
@@ -74,11 +80,45 @@ export function TwoFactorSetup({ userId, email, isEnabled, onComplete }: TwoFact
 
       toast.success("Two-factor authentication enabled successfully!");
       onComplete();
-    } catch (error: any) {
-      toast.error(error.message || "Failed to verify code");
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : "Failed to verify code";
+      toast.error(errorMessage);
       setVerificationCode("");
     } finally {
       setVerifying(false);
+    }
+  };
+
+  const handleDisable2FA = async () => {
+    if (disableCode.length !== 6) return;
+
+    setDisabling(true);
+    try {
+      const response = await fetch("/api/2fa/disable", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          userId,
+          code: disableCode,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || "Invalid verification code");
+      }
+
+      toast.success("Two-factor authentication has been disabled");
+      setShowDisableConfirm(false);
+      setDisableCode("");
+      onComplete();
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : "Failed to disable 2FA";
+      toast.error(errorMessage);
+      setDisableCode("");
+    } finally {
+      setDisabling(false);
     }
   };
 
@@ -94,21 +134,101 @@ export function TwoFactorSetup({ userId, email, isEnabled, onComplete }: TwoFact
     }
   };
 
-  // Already enabled state
+  // Already enabled state with disable option
   if (isEnabled) {
-    return (
-      <div className="p-6 rounded-2xl bg-green-500/10 border border-green-500/20">
-        <div className="flex items-center gap-4">
-          <div className="w-12 h-12 rounded-xl bg-green-500/20 flex items-center justify-center">
-            <Shield className="w-6 h-6 text-green-500" />
-          </div>
-          <div>
-            <h3 className="font-bold text-white">2FA Enabled</h3>
-            <p className="text-sm text-white/60">
-              Your account is protected with two-factor authentication
+    if (showDisableConfirm) {
+      return (
+        <div className="space-y-6">
+          <div className="p-6 rounded-2xl bg-red-500/10 border border-red-500/20">
+            <div className="flex items-center gap-4 mb-4">
+              <div className="w-12 h-12 rounded-xl bg-red-500/20 flex items-center justify-center">
+                <ShieldOff className="w-6 h-6 text-red-500" />
+              </div>
+              <div>
+                <h3 className="font-bold text-white">Disable Two-Factor Authentication</h3>
+                <p className="text-sm text-white/60">
+                  Enter your authenticator code to confirm
+                </p>
+              </div>
+            </div>
+
+            <p className="text-sm text-white/70 mb-6">
+              This will remove the extra security layer from your account. You can re-enable it anytime.
             </p>
+
+            <div className="flex justify-center mb-6">
+              <InputOTP
+                maxLength={6}
+                value={disableCode}
+                onChange={(value) => setDisableCode(value)}
+              >
+                <InputOTPGroup>
+                  <InputOTPSlot index={0} className="w-12 h-14 text-lg bg-white/[0.02] border-white/10 text-white" />
+                  <InputOTPSlot index={1} className="w-12 h-14 text-lg bg-white/[0.02] border-white/10 text-white" />
+                  <InputOTPSlot index={2} className="w-12 h-14 text-lg bg-white/[0.02] border-white/10 text-white" />
+                  <InputOTPSlot index={3} className="w-12 h-14 text-lg bg-white/[0.02] border-white/10 text-white" />
+                  <InputOTPSlot index={4} className="w-12 h-14 text-lg bg-white/[0.02] border-white/10 text-white" />
+                  <InputOTPSlot index={5} className="w-12 h-14 text-lg bg-white/[0.02] border-white/10 text-white" />
+                </InputOTPGroup>
+              </InputOTP>
+            </div>
+          </div>
+
+          <div className="flex gap-3">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => {
+                setShowDisableConfirm(false);
+                setDisableCode("");
+              }}
+              className="flex-1 h-14 rounded-2xl bg-white/[0.02] border-white/5"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleDisable2FA}
+              disabled={disableCode.length !== 6 || disabling}
+              className="flex-1 h-14 rounded-2xl bg-red-500 hover:bg-red-600 text-white font-bold"
+            >
+              {disabling ? (
+                <>
+                  <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                  Disabling...
+                </>
+              ) : (
+                "Disable 2FA"
+              )}
+            </Button>
           </div>
         </div>
+      );
+    }
+
+    return (
+      <div className="space-y-4">
+        <div className="p-6 rounded-2xl bg-green-500/10 border border-green-500/20">
+          <div className="flex items-center gap-4">
+            <div className="w-12 h-12 rounded-xl bg-green-500/20 flex items-center justify-center">
+              <Shield className="w-6 h-6 text-green-500" />
+            </div>
+            <div className="flex-1">
+              <h3 className="font-bold text-white">2FA Enabled</h3>
+              <p className="text-sm text-white/60">
+                Your account is protected with two-factor authentication
+              </p>
+            </div>
+          </div>
+        </div>
+        
+        <Button
+          variant="outline"
+          onClick={() => setShowDisableConfirm(true)}
+          className="w-full h-12 rounded-xl bg-white/[0.02] border-white/10 text-red-400 hover:text-red-300 hover:bg-red-500/10 hover:border-red-500/20"
+        >
+          <ShieldOff className="mr-2 h-4 w-4" />
+          Disable Two-Factor Authentication
+        </Button>
       </div>
     );
   }

@@ -39,6 +39,7 @@ import {
   Plus,
   Minus,
   Loader2,
+  Globe,
 } from "lucide-react";
 import Link from "next/link";
 
@@ -53,6 +54,9 @@ interface User {
   isAdmin: boolean;
   isBanned: boolean;
   createdAt: Date;
+  lastLoginIP?: string;
+  lastLoginCountry?: string;
+  lastLoginAt?: Date;
 }
 
 export default function AdminUsersPage() {
@@ -88,6 +92,9 @@ export default function AdminUsersPage() {
             isAdmin: d.isAdmin || false,
             isBanned: d.isBanned || false,
             createdAt: (d.createdAt && typeof d.createdAt.toDate === 'function') ? d.createdAt.toDate() : new Date(),
+            lastLoginIP: d.lastLoginIP || undefined,
+            lastLoginCountry: d.lastLoginCountry || undefined,
+            lastLoginAt: d.lastLoginAt?.toDate() || undefined,
           };
         }) as User[];
         setUsers(data);
@@ -294,7 +301,7 @@ export default function AdminUsersPage() {
                         )}
                       </div>
                       <p className="text-sm text-muted-foreground">{user.email || "No Email Provided"}</p>
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2 flex-wrap">
                         <span className="font-mono text-xs text-muted-foreground">
                           {user.uid.slice(0, 12)}...
                         </span>
@@ -306,6 +313,17 @@ export default function AdminUsersPage() {
                         >
                           <Copy className="h-3 w-3" />
                         </Button>
+                        {user.lastLoginCountry && (
+                          <span className="flex items-center gap-1 text-xs text-muted-foreground bg-secondary px-2 py-0.5 rounded-lg">
+                            <Globe className="h-3 w-3" />
+                            {user.lastLoginCountry}
+                          </span>
+                        )}
+                        {user.lastLoginIP && (
+                          <span className="font-mono text-xs text-muted-foreground bg-secondary px-2 py-0.5 rounded-lg">
+                            {user.lastLoginIP}
+                          </span>
+                        )}
                       </div>
                     </div>
 
