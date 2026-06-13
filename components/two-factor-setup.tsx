@@ -96,19 +96,65 @@ export function TwoFactorSetup({ userId, email, isEnabled, onComplete }: TwoFact
 
   // Already enabled state
   if (isEnabled) {
+    const [disabling, setDisabling] = useState(false);
+
+    const handleDisable2FA = async () => {
+      if (!confirm("Are you sure you want to disable two-factor authentication? This will make your account less secure.")) {
+        return;
+      }
+
+      setDisabling(true);
+      try {
+        const response = await fetch("/api/2fa/disable", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ userId }),
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+          throw new Error(data.error || "Failed to disable 2FA");
+        }
+
+        toast.success("Two-factor authentication disabled successfully");
+        onComplete();
+      } catch (error: any) {
+        toast.error(error.message || "Failed to disable 2FA");
+      } finally {
+        setDisabling(false);
+      }
+    };
+
     return (
-      <div className="p-6 rounded-2xl bg-green-500/10 border border-green-500/20">
-        <div className="flex items-center gap-4">
-          <div className="w-12 h-12 rounded-xl bg-green-500/20 flex items-center justify-center">
-            <Shield className="w-6 h-6 text-green-500" />
-          </div>
-          <div>
-            <h3 className="font-bold text-white">2FA Enabled</h3>
-            <p className="text-sm text-white/60">
-              Your account is protected with two-factor authentication
-            </p>
+      <div className="space-y-4">
+        <div className="p-6 rounded-2xl bg-green-500/10 border border-green-500/20">
+          <div className="flex items-center gap-4">
+            <div className="w-12 h-12 rounded-xl bg-green-500/20 flex items-center justify-center">
+              <Shield className="w-6 h-6 text-green-500" />
+            </div>
+            <div>
+              <h3 className="font-bold text-white">2FA Enabled</h3>
+              <p className="text-sm text-white/60">
+                Your account is protected with two-factor authentication
+              </p>
+            </div>
           </div>
         </div>
+        <button
+          onClick={handleDisable2FA}
+          disabled={disabling}
+          className="w-full h-12 rounded-xl bg-red-500/10 border border-red-500/30 text-red-500 hover:bg-red-500/20 transition-colors font-medium disabled:opacity-50"
+        >
+          {disabling ? (
+            <>
+              <Loader2 className="inline h-4 w-4 animate-spin mr-2" />
+              Disabling...
+            </>
+          ) : (
+            "Disable 2FA"
+          )}
+        </button>
       </div>
     );
   }

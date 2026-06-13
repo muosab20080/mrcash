@@ -46,8 +46,7 @@ const navItems = [
   { href: "/promo", label: "Promo Codes", icon: Ticket },
   { href: "/cashout", label: "Cashout", icon: Wallet },
   { href: "/offers", label: "Offers", icon: LayoutGrid },
-  { href: "/profile", label: "Profile", icon: User },
-  { href: "/settings", label: "Settings", icon: Settings },
+  { href: "/settings", label: "Settings", icon: User },
 ];
 
 export function Sidebar({ isOpen, onClose, isCollapsed = false }: SidebarProps) {

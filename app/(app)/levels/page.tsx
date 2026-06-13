@@ -31,13 +31,13 @@ export default function LevelsPage() {
   const [loading, setLoading] = useState(true);
 
   const totalEarned = userData?.totalEarned || 0;
-  const currentLevel = Math.floor(totalEarned / 10000) + 1;
+  const currentLevel = Math.max(1, Math.floor(totalEarned / 10000) + 1);
 
-  const currentLevelThreshold = currentLevel * 10000;
   const previousLevelThreshold = (currentLevel - 1) * 10000;
+  const currentLevelThreshold = currentLevel * 10000;
   const pointsInCurrentLevel = totalEarned - previousLevelThreshold;
   const pointsNeededForLevel = currentLevelThreshold - previousLevelThreshold;
-  const levelProgress = Math.min((pointsInCurrentLevel / pointsNeededForLevel) * 100, 100);
+  const levelProgress = pointsNeededForLevel > 0 ? Math.min((pointsInCurrentLevel / pointsNeededForLevel) * 100, 100) : 0;
 
   useEffect(() => {
     const loadClaimedLevels = async () => {

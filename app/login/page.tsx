@@ -85,10 +85,17 @@ export default function LoginPage() {
         throw new Error(data.error || "Invalid verification code");
       }
 
-      // 2FA verified, now complete the login
-      await login(email, password);
-      toast.success("Welcome back!");
-      router.push("/");
+      // 2FA verified, now log in using Firebase directly
+      try {
+        const { signInWithEmailAndPassword } = await import("firebase/auth");
+        const firebaseModule = await import("@/lib/firebase");
+        await signInWithEmailAndPassword(firebaseModule.auth, email, password);
+        toast.success("Welcome back!");
+        router.push("/");
+      } catch (loginError: any) {
+        console.error("Login error:", loginError);
+        throw new Error("Failed to complete login after 2FA verification");
+      }
     } catch (error: any) {
       toast.error(error.message || "Invalid verification code");
       setTwoFactorCode("");
