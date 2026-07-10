@@ -22,6 +22,7 @@ import {
   serverTimestamp,
 } from "firebase/firestore";
 import { auth, db } from "@/lib/firebase";
+import { getClientIp } from "@/lib/get-client-ip";
 import { useRouter } from "next/navigation";
 
 export interface UserData {
@@ -40,6 +41,7 @@ export interface UserData {
   createdAt: Date;
   twoFactorEnabled: boolean;
   twoFactorSecret?: string;
+  lastLoginIp?: string | null;
 }
 
 interface AuthContextType {
@@ -92,6 +94,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
               createdAt: data.createdAt?.toDate() || new Date(),
               twoFactorEnabled: data.twoFactorEnabled || false,
               twoFactorSecret: data.twoFactorSecret || undefined,
+              lastLoginIp: data.lastLoginIp || null,
             };
             setUserData(userDataObj);
 
@@ -112,8 +115,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => unsubscribeAuth();
   }, [router]);
 
+  // Fetch the current device IP and persist it on the user document (anti-cheat tracking).
+  const recordLoginIp = async (uid: string) => {
+    try {
+      const ip = await getClientIp();
+      if (ip) {
+        await setDoc(
+          doc(db, "users", uid),
+          { lastLoginIp: ip, lastLoginAt: serverTimestamp() },
+          { merge: true }
+        );
+      }
+    } catch (err) {
+      console.log("[v0] Failed to record login IP:", err);
+    }
+  };
+
   const login = async (email: string, password: string) => {
-    await signInWithEmailAndPassword(auth, email, password);
+    const userCredential = await signInWithEmailAndPassword(auth, email, password);
+    await recordLoginIp(userCredential.user.uid);
   };
 
   const loginWithGoogle = async () => {
@@ -148,6 +168,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         await setDoc(userDocRef, { photoURL: firebaseUser.photoURL }, { merge: true });
       }
     }
+
+    await recordLoginIp(firebaseUser.uid);
   };
 
   const register = async (email: string, password: string, username: string, photoURL?: string, referralCode?: string) => {
@@ -165,6 +187,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     }
 
+    const signupIp = await getClientIp();
+
     await setDoc(doc(db, "users", firebaseUser.uid), {
       uid: firebaseUser.uid,
       email: email,
@@ -179,6 +203,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       isAdmin: false,
       isBanned: false,
       twoFactorEnabled: false,
+      lastLoginIp: signupIp || null,
       createdAt: serverTimestamp(),
     });
   };
@@ -195,7 +220,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const updateUserProfile = async (username: string) => {
     if (!user) throw new Error("No user logged in");
     await updateProfile(user, { displayName: username });
-    await setDoc(doc(db, "users", user.uid), { username }, { merge: true });
+    const ip = await getClientIp();
+    await setDoc(
+      doc(db, "users", user.uid),
+      { username, ...(ip ? { lastLoginIp: ip } : {}) },
+      { merge: true }
+    );
   };
 
   const updateUserEmail = async (newEmail: string) => {

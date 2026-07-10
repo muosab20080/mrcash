@@ -9,9 +9,10 @@ import {
   orderBy,
   onSnapshot,
   doc,
-  updateDoc,
   writeBatch,
   where,
+  getDocs,
+  limit,
   serverTimestamp,
   increment,
 } from "firebase/firestore";
@@ -31,6 +32,8 @@ import {
   CheckCheck,
   RotateCcw,
   Ban,
+  Globe,
+  Gift,
 } from "lucide-react";
 import Link from "next/link";
 
@@ -43,9 +46,15 @@ interface Withdrawal {
   pointsDeducted: number;
   method: string;
   paymentDetails: string;
+  ipAddress: string | null;
   status: "pending" | "completed" | "rejected";
   createdAt: Date;
   processedAt?: Date;
+}
+
+interface LastOffer {
+  offerName: string;
+  offerwallName: string;
 }
 
 export default function AdminWithdrawalsPage() {
@@ -54,6 +63,7 @@ export default function AdminWithdrawalsPage() {
   const [processing, setProcessing] = useState<string | null>(null);
   const [markingAll, setMarkingAll] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [lastOffers, setLastOffers] = useState<Record<string, LastOffer>>({});
 
   useEffect(() => {
     const q = query(collection(db, "withdrawals"), orderBy("createdAt", "desc"));
@@ -72,6 +82,7 @@ export default function AdminWithdrawalsPage() {
             pointsDeducted: d.pointsDeducted || 0,
             method: d.method,
             paymentDetails: d.paymentDetails,
+            ipAddress: d.ipAddress || null,
             status: d.status,
             createdAt: d.createdAt?.toDate() || new Date(),
             processedAt: d.processedAt?.toDate(),
@@ -85,6 +96,50 @@ export default function AdminWithdrawalsPage() {
 
     return () => unsubscribe();
   }, []);
+
+  // Fetch the last completed offer for every user that has a withdrawal request.
+  useEffect(() => {
+    const userIds = Array.from(new Set(withdrawals.map((w) => w.userId).filter(Boolean)));
+    const missing = userIds.filter((id) => !(id in lastOffers));
+    if (missing.length === 0) return;
+
+    let cancelled = false;
+
+    (async () => {
+      const updates: Record<string, LastOffer> = {};
+      await Promise.all(
+        missing.map(async (uid) => {
+          try {
+            const txQuery = query(
+              collection(db, "transactions"),
+              where("userId", "==", uid),
+              orderBy("createdAt", "desc"),
+              limit(1)
+            );
+            const snap = await getDocs(txQuery);
+            if (!snap.empty) {
+              const d = snap.docs[0].data();
+              updates[uid] = {
+                offerName: d.offerName || "Unknown offer",
+                offerwallName: d.offerwallName || d.offerwall || "Unknown",
+              };
+            } else {
+              updates[uid] = { offerName: "No offers", offerwallName: "—" };
+            }
+          } catch {
+            updates[uid] = { offerName: "N/A", offerwallName: "—" };
+          }
+        })
+      );
+      if (!cancelled) {
+        setLastOffers((prev) => ({ ...prev, ...updates }));
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [withdrawals, lastOffers]);
 
   const updateWithdrawalStatus = async (
     id: string,
@@ -376,7 +431,7 @@ export default function AdminWithdrawalsPage() {
                           </span>
                           {getStatusBadge(withdrawal.status)}
                         </div>
-                        <p className="text-sm font-medium text-white">{withdrawal.username}</p>
+                        <p className="text-sm font-medium text-white">{withdrawal.username || withdrawal.userId}</p>
                         <p className="text-xs text-white/40">
                           {withdrawal.method}: {withdrawal.paymentDetails}
                         </p>
@@ -386,6 +441,20 @@ export default function AdminWithdrawalsPage() {
                         <p className="text-xs text-white/40">
                           Points deducted: {withdrawal.pointsDeducted?.toLocaleString() || 0}
                         </p>
+
+                        {/* Anti-cheat details: IP + last completed offer */}
+                        <div className="mt-2 flex flex-wrap gap-2">
+                          <span className="inline-flex items-center gap-1.5 rounded-lg border border-white/10 bg-white/5 px-2.5 py-1 text-xs font-mono text-white/70">
+                            <Globe className="h-3.5 w-3.5 text-[#3B82F6]" />
+                            {withdrawal.ipAddress || "No IP recorded"}
+                          </span>
+                          <span className="inline-flex items-center gap-1.5 rounded-lg border border-white/10 bg-white/5 px-2.5 py-1 text-xs text-white/70">
+                            <Gift className="h-3.5 w-3.5 text-[#8B5CF6]" />
+                            {lastOffers[withdrawal.userId]
+                              ? `${lastOffers[withdrawal.userId].offerName} · ${lastOffers[withdrawal.userId].offerwallName}`
+                              : "Loading last offer..."}
+                          </span>
+                        </div>
                       </div>
                     </div>
 

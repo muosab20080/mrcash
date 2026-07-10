@@ -22,8 +22,13 @@ import {
   Copy,
   Camera,
   TrendingUp,
+  Images,
+  Activity,
 } from "lucide-react";
 import Image from "next/image";
+import { AvatarSelector } from "@/components/avatar-selector";
+import { TwoFactorSetup } from "@/components/two-factor-setup";
+import { ActivityLog } from "@/components/profile/activity-log";
 
 // Points to USD conversion
 const pointsToUSD = (points: number) => (points / 1000).toFixed(2);
@@ -37,6 +42,7 @@ export default function ProfilePage() {
   const [email, setEmail] = useState(userData?.email || "");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [selectedAvatar, setSelectedAvatar] = useState<string | null>(userData?.photoURL || null);
 
   const currentLevelThreshold = (userData?.level || 1) * 10000;
   const previousLevelThreshold = ((userData?.level || 1) - 1) * 10000;
@@ -97,6 +103,22 @@ export default function ProfilePage() {
       setConfirmPassword("");
     } catch {
       toast.error("Failed to update password. You may need to re-login.");
+    } finally {
+      setLoading(null);
+    }
+  };
+
+  const handleSaveSelectedAvatar = async () => {
+    if (!selectedAvatar || selectedAvatar === userData?.photoURL) {
+      toast.info("No changes to save");
+      return;
+    }
+    setLoading("avatar-collection");
+    try {
+      await updateUserAvatar(selectedAvatar);
+      toast.success("Avatar updated successfully");
+    } catch {
+      toast.error("Failed to update avatar");
     } finally {
       setLoading(null);
     }
@@ -422,6 +444,68 @@ export default function ProfilePage() {
           </Button>
         </CardContent>
       </Card>
+
+      {/* Choose Avatar from Collection */}
+      <Card className="backdrop-blur-xl bg-background/40 border border-white/10">
+        <CardHeader className="p-5 pb-3">
+          <CardTitle className="flex items-center gap-2 text-foreground text-lg">
+            <Images className="h-5 w-5 text-primary" />
+            Choose an Avatar
+          </CardTitle>
+          <CardDescription className="text-muted-foreground">
+            Pick a new avatar from our collection
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="px-5 pb-5 space-y-4">
+          <AvatarSelector selectedAvatar={selectedAvatar} onSelect={setSelectedAvatar} />
+          <Button
+            onClick={handleSaveSelectedAvatar}
+            disabled={loading === "avatar-collection" || selectedAvatar === userData?.photoURL}
+            className="brand-gradient text-white h-12 rounded-xl w-full"
+          >
+            {loading === "avatar-collection" ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <>
+                <Save className="mr-2 h-4 w-4" />
+                Save Avatar
+              </>
+            )}
+          </Button>
+        </CardContent>
+      </Card>
+
+      {/* Two-Factor Authentication */}
+      <Card className="backdrop-blur-xl bg-background/40 border border-white/10">
+        <CardHeader className="p-5 pb-3">
+          <CardTitle className="flex items-center gap-2 text-foreground text-lg">
+            <Shield className="h-5 w-5 text-primary" />
+            Two-Factor Authentication
+          </CardTitle>
+          <CardDescription className="text-muted-foreground">
+            Secure your account with an extra layer of protection
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="px-5 pb-5">
+          {userData && (
+            <TwoFactorSetup
+              userId={userData.uid}
+              email={userData.email}
+              isEnabled={userData.twoFactorEnabled}
+              onComplete={() => window.location.reload()}
+            />
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Activity & Rewards Log */}
+      <div className="space-y-4">
+        <div className="flex items-center gap-2 px-1">
+          <Activity className="h-5 w-5 text-primary" />
+          <h2 className="text-lg font-bold text-foreground">Activity &amp; Rewards Log</h2>
+        </div>
+        {userData && <ActivityLog userId={userData.uid} />}
+      </div>
 
       {/* Logout */}
       <Card className="backdrop-blur-xl bg-background/40 border border-destructive/20">
